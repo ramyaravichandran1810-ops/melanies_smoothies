@@ -1,41 +1,36 @@
 import streamlit as st
+from snowflake.snowpark.context import get_active_session
 
-# Snowflake connection (Streamlit managed)
-conn = st.connection("snowflake")
-session = conn.session()
+st.title("Customize Your Smoothie! 🍓")
 
-st.title("Customize your Smoothie 🍓")
-
-# Fruit selection
-option = st.selectbox(
-    "Choose a fruit:",
-    ("Strawberry", "Banana", "Mango", "Pineapple")
-)
-st.write("You selected:", option)
+# Get Snowflake session
+session = get_active_session()
 
 # Name input
-name_on_smoothie = st.text_input("Name on Smoothie")
-st.write("Name on your smoothie:", name_on_smoothie)
+name_on_smoothie = st.text_input("Name on Smoothie:")
 
-# Load Snowflake table
-my_dataframe = session.table("SMOOTHIES.PUBLIC.FRUIT_OPTIONS").select("FRUIT_NAME")
-st.dataframe(my_dataframe)
+if name_on_smoothie:
+    st.write("The name on your Smoothie will be:", name_on_smoothie)
 
-# Multiselect
-ingredients_list = st.multiselect(
+# Get ingredients from Snowflake table
+ingredients_df = session.sql("SELECT * FROM SMOOTHIES.PUBLIC.INGREDIENTS").to_pandas()
+
+ingredients_list = ingredients_df["INGREDIENT_NAME"].tolist()
+
+# Multi-select (max 5)
+selected_ingredients = st.multiselect(
     "Choose up to 5 ingredients:",
-    my_dataframe,
+    ingredients_list,
     max_selections=5
 )
 
-# Insert order
-if ingredients_list:
-    ingredients_string = ", ".join(ingredients_list)
+# Show selected ingredients
+if selected_ingredients:
+    st.write("You selected:", selected_ingredients)
 
-    if st.button("Submit Order"):
-        session.sql(f"""
-            INSERT INTO SMOOTHIES.PUBLIC.ORDERS (INGREDIENTS)
-            VALUES ('{ingredients_string}')
-        """).collect()
-
-        st.success("Your Smoothie Order is Placed! 🎉")
+# Button to test form
+if st.button("Create Smoothie"):
+    if name_on_smoothie and selected_ingredients:
+        st.success(f"Smoothie for {name_on_smoothie} created with {selected_ingredients}")
+    else:
+        st.warning("Please enter name and select ingredients")
